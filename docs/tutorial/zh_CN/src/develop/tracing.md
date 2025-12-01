@@ -2,17 +2,17 @@
 
 AgentScope Studio 为 AI 应用提供了简单易用的可观测性与链路追踪能力。它可以帮助使用者快速了解到 AI 应用中的各种重要的时间和信息，如输入、输出、工具调用情况、执行耗时、错误、成本花销等。
 
-AgentScope Studio 的可观测性基于 OpenTelemetry 语义规范和 OTLP 数据协议构建，它不仅可以开箱即用地接收和存储 AgentScope 上报的各种可观测信息，还支持任意的基于 OpenTelemetry 或 LoongSuite 的采集工具/AI 应用框架上报的数据的集成。
+AgentScope Studio 的可观测性基于 [OpenTelemetry 语义规范](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/)和 [OTLP 协议](https://opentelemetry.io/docs/specs/otlp/)构建，它不仅可以开箱即用地接收和存储 AgentScope 上报的各种可观测信息，还支持任意的基于 OpenTelemetry 或 LoongSuite 的采集工具/AI 应用框架上报的数据的集成。
 
 ![Trace](./assets/tracing_detail_chat_history.png)
 
 作为 AI 应用开发者，您可以：
 
-- 快速实现开发与调试，了解上下文的产生、组织与传递
-- 捕获评估需要的基本数据
+- 通过了解上下文的产生、组织与传递来加速开发和调试过程
+- 捕获评估和微调需要的基本数据
 - 定位应用中的错误和异常
-- 优化调用耗时
-- 追踪模型调用花销，辅助优化成本
+- 识别和优化性能瓶颈
+- 追踪和管理模型调用开销
 
 作为可观测性组件开发者，您可以：
 
@@ -98,8 +98,8 @@ OpenTelemetry 面向 Generative AI 类应用的可观测数据提供了一组语
 |---|---|---|---|---|
 | `gen_ai.operation.name` | `Required` | string | 正在执行的操作的名称。 | `chat`; `generate_content`; `text_completion` |
 | `error.type` | `Conditionally Required` if the operation ended in an error | string | 操作中止时抛出的错误。 | `timeout`; `java.net.UnknownHostException`; `server_certificate_invalid`; `500` |
-| `agentscope.format.target` | `Required` | string | 格式化要转为的目标类型。 | `dashscope`; `openai` |
-| `agentscope.format.count` | `Required` | string | 实际被格式化的消息数量。[1] | `3` |
+| `agentscope.format.target` | `Required` | string | 格式化要转为的目标类型。如果无法解析到目标类型，则设置为'unknown'。 | `dashscope`; `openai` |
+| `agentscope.format.count` | `Recommended` | int | 实际被格式化的消息数量。[1] | `3` |
 | `agentscope.function.name` | `Recommended` | string | 调用的方法/函数名。 | `DashScopeChatModel.__call__`; `ToolKit.callTool` |
 | `agentscope.function.input` | `Opt-In` | string | 方法/函数的输入。[2] | {<br/>&nbsp;&nbsp;"tool_call": {<br/>&nbsp;&nbsp;&nbsp;&nbsp;"type": "tool_use",<br/>&nbsp;&nbsp;&nbsp;&nbsp;"id": "call_83fce0d1d2684545a13649",<br/>&nbsp;&nbsp;&nbsp;&nbsp;"name": "multiply",<br/>&nbsp;&nbsp;&nbsp;&nbsp;"input": {<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"a": 5,<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"b": 3<br/>&nbsp;&nbsp;&nbsp;&nbsp;}<br/>&nbsp;&nbsp;}<br/>} |
 | `agentscope.function.output` | `Opt-In` | string | 方法/函数的返回值。[3] | `ToolResponse(content=[{'type': 'text', 'text': '5 × 3 = 15'}], metadata=None, stream=False, is_last=True, is_interrupted=False, id='2025-11-28 00:38:52.733_cc4ead')` |
@@ -171,10 +171,10 @@ agentscope.init(studio_url="http://localhost:3000") # 将此处替换为 Studio 
 maven:
 
 ```xml
-<depenedency>
+<dependency>
   <groupId>io.agentscope</groupId>
   <artifactId>agentscope-extensions-studio</artifactId>
-</depencency>
+</dependency>
 ```
 
 gradle:
@@ -278,7 +278,6 @@ with tracer.start_as_current_span("test") as span:
         # attributes may be set here
         span.set_attributes({"test_key": "test_value"})
         span.set_status(trace_api.StatusCode.OK)
-        span.end()
         return res
 
     except Exception as e:
@@ -287,7 +286,5 @@ with tracer.start_as_current_span("test") as span:
             str(e),
         )
         span.record_exception(e)
-        # end span even exception is raised
-        span.end()
         raise e from None
 ```
