@@ -1,10 +1,5 @@
 import fs from 'fs/promises';
-import {
-    EvalTaskMeta,
-    EvalTask,
-    EvalStats,
-    EvalMetricResult,
-} from '../../../shared/src/types/evaluation';
+import path from 'path';
 import {
     ArrayElementContainsFilterOperator,
     ArrayFilterOperator,
@@ -12,7 +7,12 @@ import {
     TableData,
     TableRequestParams,
 } from '../../../shared/src';
-import path from 'path';
+import {
+    EvalMetricResult,
+    EvalStats,
+    EvalTask,
+    EvalTaskMeta,
+} from '../../../shared/src/types/evaluation';
 
 export class FileDao {
     static async getJSONFile<T>(filePath: string): Promise<T> {
@@ -112,12 +112,12 @@ export class FileDao {
                         case 'input':
                             switch (filterOps.operator) {
                                 case StringFilterOperator.CONTAINS:
-                                    if (task.input.includes(filterOps.value)) {
+                                    if (!task.input.includes(filterOps.value)) {
                                         reserve = false;
                                     }
                                     break;
                                 case StringFilterOperator.NOT_CONTAINS:
-                                    if (!task.input.includes(filterOps.value)) {
+                                    if (task.input.includes(filterOps.value)) {
                                         reserve = false;
                                     }
                                     break;
@@ -212,7 +212,7 @@ export class FileDao {
 
         // Sort
         if (params.sort) {
-            // 按照sort.field数据域和sort.order排序，简单方式是全按照JSON.stringify来比较
+            // Sort by sort.field and sort.order using JSON.stringify for comparison
             tasks.sort((a, b) => {
                 const field = params.sort!.field as keyof EvalTaskMeta;
                 const order = params.sort!.order;
@@ -242,7 +242,7 @@ export class FileDao {
     }
 
     static async getAllEvaluationTags(evaluationDir: string) {
-        // 从task_meta文件中获取所有的tags，以及对应的数量
+        // Get all tags and their counts from task_meta files
         const stat = await fs.stat(evaluationDir);
         if (!stat.isDirectory()) {
             throw new Error(`${evaluationDir} is not a directory`);
@@ -307,7 +307,7 @@ export class FileDao {
 
         // Read from different repeats
 
-        // 遍历 evaluationTaskDir 下的所有子目录，每个子目录代表一个 repeat
+        // Iterate through all subdirectories in evaluationTaskDir, each represents a repeat
         const repeats: EvalTask['repeats'] = {};
         const subdirs = await fs.readdir(evaluationTaskDir);
         for (const repeatDir of subdirs) {
@@ -322,7 +322,7 @@ export class FileDao {
             // Read stats.json, solution.json if exists
             const statsPath = path.join(repeatPath, 'stats.json');
             const statsPathStat = await fs.stat(statsPath);
-            if (!statsPathStat.isFile()) {
+            if (statsPathStat.isFile()) {
                 repeats[repeatDir].stats =
                     await this.getJSONFile<EvalStats>(statsPath);
             }
@@ -343,6 +343,7 @@ export class FileDao {
             if (metricsDirStat.isDirectory()) {
                 // Read all json files in the metricsDirPath, each represents a metric result
                 const metricFiles = await fs.readdir(metricsDirPath);
+
                 for (const metricFile of metricFiles) {
                     if (metricFile.endsWith('.json')) {
                         const metricFilePath = path.join(
@@ -353,7 +354,8 @@ export class FileDao {
                             await this.getJSONFile<Record<string, unknown>>(
                                 metricFilePath,
                             );
-                        if (metricData.name && metricData.result) {
+
+                        if (metricData.name && metricData.result !== null) {
                             repeats[repeatDir].result =
                                 repeats[repeatDir].result || {};
                             repeats[repeatDir].result[

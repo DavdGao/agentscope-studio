@@ -1,227 +1,414 @@
-import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card.tsx';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible.tsx';
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs.tsx';
 import { useEvaluationTaskContext } from '@/context/EvaluationTaskContext';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.tsx';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.tsx';
+import { ModelCard, ToolCard } from '@/pages/EvalPage/EvaluationPage/DataCard';
+import { formatNumber } from '@/utils/common';
+import {
+    BlockType,
+    TextBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+} from '@shared/types';
 import { EvalTrajectory } from '@shared/types/evaluation.ts';
-import { BlockType, TextBlock, ToolResultBlock, ToolUseBlock } from '@shared/types';
+import { ChevronLeftIcon, CpuIcon, SettingsIcon } from 'lucide-react';
+import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate, useParams } from 'react-router-dom';
 
+import ChartPage from './ChartPage';
 
-const TextStep = memo(({block} : {block: TextBlock}) => {
-    return <div>
-        {block.text}
-    </div>
-});
-
-const ToolStep = memo(({toolUseBlock, toolResultBlock}: {toolUseBlock: ToolUseBlock, toolResultBlock?: ToolResultBlock}) => {
-
-    let toolInputString = [];
-    Object.entries(toolUseBlock.input).forEach(
-        ([key, value]) => {
-            toolInputString.push(`${key}=${JSON.stringify(value)}`);
-        }
-    )
-
-    const toolUseString = `(${toolInputString.join(",\n\t")})`;
-
-    return <div
-        className="flex flex-row items-start gap-4 py-2"
-    >
-        <div className="flex mt-1">
-            Step
-        </div>
-        <div>
-            <div
-                className="flex rounded-full border-red-600 border size-8 items-center justify-center"
-            >
-                <div
-                    className="rounded-full border-red-600 border size-4"
-                >
+import SyntaxHighlighter from 'react-syntax-highlighter';
+const TokenUsageCard = memo(
+    ({
+        inputTokens,
+        outputTokens,
+    }: {
+        inputTokens: number;
+        outputTokens: number;
+    }) => {
+        const { t } = useTranslation();
+        return (
+            <div className="rounded-xl border shadow">
+                <div className="p-6 flex flex-row items-center justify-between space-y-0 pb-1">
+                    <h3 className="tracking-tight text-sm font-medium">
+                        {t('common.token-usage')}
+                    </h3>
+                    <CpuIcon className="size-4 text-muted-foreground" />
+                </div>
+                <div className="p-6 min-h-[5.5rem] pt-2">
+                    <div className="text-2xl font-bold">
+                        {formatNumber(inputTokens + outputTokens)}
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                        <div className="flex flex-col">
+                            <span className="text-muted-foreground text-xs">
+                                {t('common.prompt')}
+                            </span>
+                            <span className="text-sm font-medium">
+                                {formatNumber(inputTokens)}
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-muted-foreground text-xs">
+                                {t('common.completion')}
+                            </span>
+                            <span className="text-sm font-medium">
+                                {formatNumber(outputTokens)}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div className="flex flex-1  text-sm items-center overflow-x-hidden">
-            <span className="font-medium text-sm">{toolUseBlock.name}</span><span className="truncate">{toolUseString}</span>
-        </div>
-    </div>
-})
+        );
+    },
+);
 
-const TrajectoryCard = memo(({ input, trajectory }: { input: string, trajectory: EvalTrajectory }) => {
-    const {t} = useTranslation();
-    const resultMap: Record<string, ToolResultBlock> = {};
-    trajectory.forEach(
-        block => {
+const TextStep = memo(
+    ({
+        block,
+        stepIndex,
+        isLast,
+    }: {
+        block: TextBlock;
+        stepIndex: number;
+        isLast: boolean;
+    }) => {
+        const { t } = useTranslation();
+        return (
+            <div className="flex flex-row items-start gap-4">
+                <div className="flex mt-3 text-xs text-muted-foreground w-12 shrink-0">
+                    {t('common.step')} {stepIndex}
+                </div>
+                <div className="flex flex-col items-center">
+                    <div className="flex rounded-full border-blue-600 border size-8 items-center justify-center my-2">
+                        <div className="rounded-full border-blue-600 border size-4"></div>
+                    </div>
+                    {!isLast && (
+                        <div className="w-px bg-border flex-1 min-h-4"></div>
+                    )}
+                </div>
+                <div className="flex flex-1 text-sm items-center py-2">
+                    {block.text}
+                </div>
+            </div>
+        );
+    },
+);
+
+const ToolStep = memo(
+    ({
+        toolUseBlock,
+        toolResultBlock,
+        stepIndex,
+        isLast,
+    }: {
+        toolUseBlock: ToolUseBlock;
+        toolResultBlock?: ToolResultBlock;
+        stepIndex: number;
+        isLast: boolean;
+    }) => {
+        const { t } = useTranslation();
+        const [isOpen, setIsOpen] = useState(false);
+
+        const toolInputString: string[] = [];
+        Object.entries(toolUseBlock.input).forEach(([key, value]) => {
+            toolInputString.push(`${key}=${JSON.stringify(value)}`);
+        });
+
+        const toolUseString = `(${toolInputString.join(',\n\t')})`;
+
+        return (
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                <div className="flex flex-row items-start gap-4">
+                    <div className="flex mt-3 text-xs text-muted-foreground w-12 shrink-0">
+                        {t('common.step')} {stepIndex}
+                    </div>
+                    <div className="flex flex-col items-center">
+                        <CollapsibleTrigger asChild>
+                            <div
+                                className="flex rounded-full border-red-600 border size-8 items-center justify-center cursor-pointer hover:bg-muted transition-colors my-2"
+                                title={
+                                    toolResultBlock
+                                        ? t('tooltip.click-to-view-result')
+                                        : t('tooltip.no-result-available')
+                                }
+                            >
+                                <div className="rounded-full border-red-600 border size-4"></div>
+                            </div>
+                        </CollapsibleTrigger>
+                        {!isLast && (
+                            <div className="w-px bg-border flex-1 min-h-4"></div>
+                        )}
+                    </div>
+                    <div className="flex flex-1 text-sm items-center overflow-x-hidden py-2">
+                        <span className="font-medium text-sm mr-1">
+                            {toolUseBlock.name}
+                        </span>
+                        <span className="truncate text-muted-foreground">
+                            {toolUseString}
+                        </span>
+                    </div>
+                </div>
+                <CollapsibleContent>
+                    {toolResultBlock && (
+                        <div className="ml-24 mb-2 p-3 rounded-lg bg-muted/50 border">
+                            <div className="text-xs text-muted-foreground mb-1">
+                                {t('common.result')}:
+                            </div>
+                            <div className="text-sm whitespace-pre-wrap break-all max-h-64 overflow-auto">
+                                {typeof toolResultBlock.output === 'string' ? (
+                                    toolResultBlock.output
+                                ) : (
+                                    <SyntaxHighlighter
+                                        language="json"
+                                        customStyle={{
+                                            margin: 0,
+                                            borderRadius: '8px',
+                                        }}
+                                    >
+                                        {JSON.stringify(
+                                            toolResultBlock.output,
+                                            null,
+                                            2,
+                                        )}
+                                    </SyntaxHighlighter>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </CollapsibleContent>
+            </Collapsible>
+        );
+    },
+);
+
+const TrajectoryCard = memo(
+    ({ input, trajectory }: { input: string; trajectory: EvalTrajectory }) => {
+        const { t } = useTranslation();
+        const resultMap: Record<string, ToolResultBlock> = {};
+        trajectory.forEach((block) => {
             if (block.type === BlockType.TOOL_RESULT) {
                 resultMap[block.id] = block;
             }
-        }
-    )
+        });
+        const toolSteps = trajectory.filter(
+            (block) => block.type !== BlockType.TOOL_RESULT,
+        );
 
-    return <Card>
-        <CardHeader>
-            <CardTitle>
-                {t('common.trajectory')}
-            </CardTitle>
-        </CardHeader>
-        <CardContent>
-            {input}
-            {
-                trajectory.map(
-                    (step) => {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t('common.trajectory')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {input}
+                    {toolSteps.map((step, index) => {
+                        const isLast = index === toolSteps.length - 1;
+
                         if (step.type === BlockType.TEXT) {
-                            return <TextStep block={step} />;
+                            return (
+                                <TextStep
+                                    key={`text-${index}`}
+                                    block={step}
+                                    stepIndex={index + 1}
+                                    isLast={isLast}
+                                />
+                            );
                         }
 
                         if (step.type === BlockType.TOOL_USE) {
-                            return <ToolStep
-                                toolUseBlock={step}
-                                toolResultBlock={resultMap[step.id]}
-                            />;
+                            return (
+                                <ToolStep
+                                    key={step.id}
+                                    toolUseBlock={step}
+                                    toolResultBlock={resultMap[step.id]}
+                                    stepIndex={index + 1}
+                                    isLast={isLast}
+                                />
+                            );
                         }
 
                         return null;
-                    }
-                )
-            }
-        </CardContent>
-
-    </Card>;
-});
-
+                    })}
+                </CardContent>
+            </Card>
+        );
+    },
+);
 
 const TaskPage = () => {
     const { task } = useEvaluationTaskContext();
     const { t } = useTranslation();
+    const navigate = useNavigate();
+    const { evalId } = useParams<{ evalId: string }>();
+
+    const handleBackToEvaluation = () => {
+        navigate(`/eval/${evalId}`);
+    };
+
+    const totalRepeats = task.total_repeats || Object.keys(task.repeats).length;
+    const completedRepeats = Object.values(task.repeats).filter(
+        (repeat) => repeat.solution !== undefined,
+    ).length;
+    const progress =
+        totalRepeats > 0
+            ? Math.round((completedRepeats / totalRepeats) * 100)
+            : 0;
+
+    const getStatus = () => {
+        if (completedRepeats === totalRepeats) {
+            return t('table.column.finished');
+        }
+        return t('table.column.incomplete');
+    };
 
     return (
         <div className="flex-1 h-full overflow-y-auto">
-            <div className="max-w-5xl mx-auto px-6 py-6 h-full">
-                <div className="text-muted-foreground mb-2">
-                    Back to evaluation
+            <div className="max-w-5xl mx-auto px-6 py-6 space-y-6 h-full">
+                <div
+                    className="text-muted-foreground flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors"
+                    onClick={handleBackToEvaluation}
+                >
+                    <ChevronLeftIcon className="size-4" />
+                    {t('action.back-to-evaluation')}
                 </div>
                 <div className="flex flex-col gap-1.5">
                     <div className="truncate font-bold text-xl">
                         {t('common.task')} {task.meta.id}
                     </div>
-                    <div className="truncate text-sm text-muted-foreground mb-3">
+                    <div className="truncate text-sm text-muted-foreground">
                         {t('common.evaluation')}: {task.meta.id}
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="col-span-1">
-                        <div className="rounded-xl border shadow">
-                            <div className="p-6 flex flex-row items-center justify-between space-y-0 pb-1">
-                                <h3 className="tracking-tight text-sm font-medium">
-                                    {t('common.status')}
-                                </h3>
-                                <div className="text-muted-foreground h-4 w-4">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        className="lucide-icon lucide lucide-settings"
-                                    >
-                                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-
-                                        <circle cx="12" cy="12" r="3"></circle>
-                                    </svg>
-                                </div>
+                {/* Status Card */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="rounded-xl border shadow">
+                        <div className="p-6 flex flex-row items-center justify-between space-y-0 pb-1">
+                            <h3 className="tracking-tight text-sm font-medium">
+                                {t('common.status')}
+                            </h3>
+                            <SettingsIcon className="size-4 text-muted-foreground" />
+                        </div>
+                        <div className="p-6 min-h-[5.5rem] pt-2 space-y-2">
+                            <div className="text-2xl font-bold">
+                                {getStatus()}
                             </div>
-                            <div className="p-6 min-h-[5.5rem] pt-2 space-y-4">
-                                <div>Unkown</div>
-                                <div>progress: 12%</div>
+                            <div className="text-sm text-muted-foreground">
+                                {t('table.column.progress')}: {progress}% (
+                                {completedRepeats}/{totalRepeats})
                             </div>
                         </div>
                     </div>
-                    <div className="col-span-full rounded-xl border shadow">
-                        <div className="p-6 flex flex-col justify-between space-y-0 pb-1">
-                            <h3 className="tracking-tight text-sm font-medium">
-                                Input
-                            </h3>
-                        </div>
-                        <div className="p-6 min-h-[5.5rem] pt-2 space-y-4">
+                </div>
+
+                {/* Input Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t('common.input')}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="max-h-64 overflow-auto">
+                        <SyntaxHighlighter
+                            language="string"
+                            wrapLongLines={true}
+                            customStyle={{
+                                margin: 0,
+                                borderRadius: '8px',
+                            }}
+                        >
                             {task.meta.input}
-                        </div>
-                    </div>
-
-                    <div className="col-span-full rounded-xl border shadow">
-                        <div className="p-6 flex flex-col justify-between space-y-0 pb-1">
-                            <h3 className="tracking-tight text-sm font-medium">
-                                Ground Truth
-                            </h3>
-                        </div>
-                        <div className="p-6 min-h-[5.5rem] pt-2 space-y-4">
+                        </SyntaxHighlighter>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t('table.column.ground-truth')}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="max-h-64 overflow-auto">
+                        <SyntaxHighlighter
+                            language="json"
+                            wrapLongLines={true}
+                            customStyle={{
+                                margin: 0,
+                                borderRadius: '8px',
+                            }}
+                        >
                             {JSON.stringify(task.meta.ground_truth, null, 2)}
-                        </div>
-                    </div>
+                        </SyntaxHighlighter>
+                    </CardContent>
+                </Card>
 
-                    {/*<Segmented*/}
-                    {/*    className="col-span-full"*/}
-                    {/*    options={[*/}
-                    {/*        'overview',*/}
-                    {/*        ...Object.keys(task.repeats).map(*/}
-                    {/*            (repeatId) => `repeatId: ${repeatId}`,*/}
-                    {/*        ),*/}
-                    {/*    ]}*/}
-                    {/*/>*/}
-
-                    {/*<div className="col-span-full rounded-xl border shadow">*/}
-                    {/*    <div className="p-6 flex flex-col justify-between space-y-0 pb-1">*/}
-                    {/*        <h3 className="tracking-tight text-sm font-medium">*/}
-                    {/*            Output*/}
-                    {/*        </h3>*/}
-                    {/*    </div>*/}
-                    {/*    <div className="p-6 min-h-[5.5rem] pt-2 space-y-4"></div>*/}
-                    {/*</div>*/}
-
-                    {/*<div className="col-span-full rounded-xl border shadow">*/}
-                    {/*    <div className="p-6 flex flex-col justify-between space-y-0 pb-1">*/}
-                    {/*        <h3 className="tracking-tight text-sm font-medium">*/}
-                    {/*            Trajectory*/}
-                    {/*        </h3>*/}
-                    {/*    </div>*/}
-                    {/*    <div className="p-6 min-h-[5.5rem] pt-2 space-y-4"></div>*/}
-                    {/*</div>*/}
-
-                    <Tabs defaultValue="0" className="col-span-full">
-                        <TabsList>
-                            <TabsTrigger value="overview">
-                                {t('common.overview')}
+                {/* Tabs with Overview and Repeats */}
+                <Tabs defaultValue="overview" className="w-full">
+                    <TabsList>
+                        <TabsTrigger value="overview">
+                            {t('common.overview')}
+                        </TabsTrigger>
+                        {Object.keys(task.repeats).map((repeatId) => (
+                            <TabsTrigger key={repeatId} value={repeatId}>
+                                {`repeat ${repeatId}`}
                             </TabsTrigger>
-                            {
-                                Object.keys(task.repeats).map((repeatId) => (
-                                    <TabsTrigger
-                                        key={repeatId}
-                                        value={repeatId}
-                                    >
-                                        {`repeat ${repeatId}`}
-                                    </TabsTrigger>
-                                ))
-                            }
-                        </TabsList>
-                        {
-                            Object.entries(task.repeats).map(
-                                ([repeatId, repeatData]) => <TabsContent
+                        ))}
+                    </TabsList>
+
+                    {/* Overview Tab - Aggregated data */}
+                    <TabsContent
+                        value="overview"
+                        className="flex flex-col gap-4"
+                    >
+                        <ChartPage />
+                    </TabsContent>
+
+                    {Object.entries(task.repeats).map(
+                        ([repeatId, repeatData]) => {
+                            const stats = repeatData.stats;
+                            const repeatInputTokens = stats
+                                ? Object.values(stats.chat_usage || {}).reduce(
+                                      (acc, usage) =>
+                                          acc + (usage.input_tokens || 0),
+                                      0,
+                                  )
+                                : 0;
+                            const repeatOutputTokens = stats
+                                ? Object.values(stats.chat_usage || {}).reduce(
+                                      (acc, usage) =>
+                                          acc + (usage.output_tokens || 0),
+                                      0,
+                                  )
+                                : 0;
+
+                            return (
+                                <TabsContent
+                                    key={repeatId}
                                     value={repeatId}
                                     className="flex flex-col gap-4"
                                 >
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle>
-                                                {t('common.stats')}
-                                            </CardTitle>
-                                            <CardContent>
-                                                {String(repeatData.stats)}
-                                            </CardContent>
-                                        </CardHeader>
-                                    </Card>
+                                    {/* Stats Cards for this repeat */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <ModelCard models={stats?.llm ?? {}} />
+                                        <ToolCard tools={stats?.tool ?? {}} />
+                                    </div>
+
+                                    {/* Token Usage Card for this repeat */}
+                                    <TokenUsageCard
+                                        inputTokens={repeatInputTokens}
+                                        outputTokens={repeatOutputTokens}
+                                    />
 
                                     <Card>
                                         <CardHeader>
@@ -229,19 +416,36 @@ const TaskPage = () => {
                                                 {t('common.output')}
                                             </CardTitle>
                                         </CardHeader>
-                                        <CardContent>
-                                            {JSON.stringify(repeatData.solution?.output) || ''}
+                                        <CardContent className="max-h-64 overflow-auto">
+                                            <SyntaxHighlighter
+                                                language="json"
+                                                wrapLongLines={true}
+                                                customStyle={{
+                                                    margin: 0,
+                                                    borderRadius: '8px',
+                                                }}
+                                            >
+                                                {JSON.stringify(
+                                                    repeatData.solution?.output,
+                                                    null,
+                                                    2,
+                                                ) || ''}
+                                            </SyntaxHighlighter>
                                         </CardContent>
                                     </Card>
 
-                                    <TrajectoryCard input={task.meta.input} trajectory={repeatData.solution?.trajectory || []} />
-
+                                    <TrajectoryCard
+                                        input={task.meta.input}
+                                        trajectory={
+                                            repeatData.solution?.trajectory ||
+                                            []
+                                        }
+                                    />
                                 </TabsContent>
-                            )
-                        }
-
-                    </Tabs>
-                </div>
+                            );
+                        },
+                    )}
+                </Tabs>
             </div>
         </div>
     );

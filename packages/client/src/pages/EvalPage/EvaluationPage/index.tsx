@@ -1,18 +1,7 @@
-import { Key, memo, MouseEvent, useState } from 'react';
 import AsTable from '@/components/tables/AsTable';
-import { NumberCell, TagsCell, TextCell } from '@/components/tables/utils.tsx';
-import { useNavigate } from 'react-router-dom';
-import NumericalView from './MetricView/NumericalView.tsx';
-import { convertToDTO } from './utils.ts';
-import { TableColumnsType } from 'antd';
-import { useTranslation } from 'react-i18next';
-import { ModelCard, ToolCard } from '@/pages/EvalPage/EvaluationPage/DataCard';
-import { useEvaluationContext } from '@/context/EvaluationContext.tsx';
-import {
-    useEvaluationTasksContext,
-    EvaluationTasksContextProvider,
-} from '@/context/EvaluationTasksContext.tsx';
-import { EvalTaskMeta } from '@shared/types/evaluation.ts';
+import { TagsCell, TextCell } from '@/components/tables/utils.tsx';
+import { Button } from '@/components/ui/button.tsx';
+import { Checkbox } from '@/components/ui/checkbox.tsx';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,17 +12,35 @@ import {
     DropdownMenuShortcut,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx';
-import { Button } from '@/components/ui/button.tsx';
-import { CirclePlusIcon, SearchIcon } from 'lucide-react';
 import {
     InputGroup,
     InputGroupAddon,
     InputGroupInput,
 } from '@/components/ui/input-group.tsx';
-import { Checkbox } from '@/components/ui/checkbox.tsx';
-import { ArrayFilterOperator } from '@shared/types';
+import { useEvaluationContext } from '@/context/EvaluationContext.tsx';
+import {
+    EvaluationTasksContextProvider,
+    useEvaluationTasksContext,
+} from '@/context/EvaluationTasksContext.tsx';
 import { EmptyPage } from '@/pages/DefaultPage/index.tsx';
-
+import { ModelCard, ToolCard } from '@/pages/EvalPage/EvaluationPage/DataCard';
+import { formatDateTime, formatNumber } from '@/utils/common';
+import { ArrayFilterOperator } from '@shared/types';
+import { EvalTaskMeta } from '@shared/types/evaluation.ts';
+import { TableColumnsType } from 'antd';
+import {
+    ActivityIcon,
+    CirclePlusIcon,
+    CpuIcon,
+    DollarSignIcon,
+    SearchIcon,
+    SettingsIcon,
+} from 'lucide-react';
+import { Key, memo, MouseEvent, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import NumericalView from './MetricView/NumericalView.tsx';
+import { convertToDTO } from './utils.ts';
 const TasksTable = memo(({ evaluationId }: { evaluationId: string }) => {
     const navigate = useNavigate();
     const { t } = useTranslation();
@@ -43,35 +50,47 @@ const TasksTable = memo(({ evaluationId }: { evaluationId: string }) => {
         tableRequestParams,
         setTableRequestParams,
         total,
+        tags,
     } = useEvaluationTasksContext();
     const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
-    const { tags } = useEvaluationTasksContext();
 
-    const columns: TableColumnsType<EvalTaskMeta> = [
-        {
-            key: 'id',
-            title: 'Task ID',
-            render: (value) => <TextCell text={value || ''} selected={false} />,
-        },
-        {
-            key: 'input',
-            render: (value) => (
-                <TextCell
-                    text={value || ''}
-                    selected={false}
-                    className="max-w-[200px]"
-                />
-            ),
-        },
-        {
-            key: 'metrics',
-            render: (value) => <NumberCell number={value} selected={false} />,
-        },
-        {
-            key: 'tags',
-            render: (value) => <TagsCell tags={value} selected={false} />,
-        },
-    ];
+    const columns: TableColumnsType<EvalTaskMeta> = useMemo(
+        () => [
+            {
+                key: 'id',
+                title: t('table.column.taskId'),
+                render: (value: string) => (
+                    <TextCell text={value || ''} selected={false} />
+                ),
+            },
+            {
+                key: 'input',
+                render: (value: string) => (
+                    <TextCell
+                        text={value || ''}
+                        selected={false}
+                        className="max-w-[200px]"
+                    />
+                ),
+            },
+            {
+                key: 'metrics',
+                render: (value: string[]) => (
+                    <TextCell
+                        text={value.length.toString() || '0'}
+                        selected={false}
+                    />
+                ),
+            },
+            {
+                key: 'tags',
+                render: (value: string[]) => (
+                    <TagsCell tags={value} selected={false} />
+                ),
+            },
+        ],
+        [t],
+    );
 
     const handleTagFilterChange = (tag: string) => {
         setTableRequestParams((prev) => {
@@ -165,15 +184,17 @@ const TasksTable = memo(({ evaluationId }: { evaluationId: string }) => {
     return (
         <div className="block pb-8">
             <div className="rounded-xl border shadow">
-                <div className="flex flex-ro items-center justify-between space-y-1.5 p-6 pb-2 text-sm font-medium">
+                <div className="flex flex-row items-center justify-between space-y-1.5 p-6 pb-2 text-sm font-medium">
                     {t('common.task')}
                 </div>
                 <div className="flex flex-col gap-3 p-6">
                     <AsTable<EvalTaskMeta>
                         columns={columns}
                         searchableColumns={['id', 'input']}
+                        searchType="evaluation-task"
                         loading={tableLoading}
                         dataSource={tableDataSource}
+                        rowKey="id"
                         onRow={(record: EvalTaskMeta) => {
                             return {
                                 onClick: (event: MouseEvent) => {
@@ -274,7 +295,9 @@ const EvaluationPage = () => {
                         {evaluation.evaluationName}
                     </div>
                     <div className="text-sm text-muted-foreground mb-3">
-                        Evaluation on Benchmark {evaluation.benchmarkName}
+                        {t('description.eval.benchmark-subtitle', {
+                            benchmarkName: evaluation.benchmarkName,
+                        })}
                     </div>
                 </div>
 
@@ -285,24 +308,7 @@ const EvaluationPage = () => {
                                 <h3 className="tracking-tight text-sm font-medium">
                                     {t('common.evaluation')}
                                 </h3>
-                                <div className="text-muted-foreground h-4 w-4">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="lucide-icon lucide lucide-settings"
-                                    >
-                                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-
-                                        <circle cx="12" cy="12" r="3"></circle>
-                                    </svg>
-                                </div>
+                                <SettingsIcon className="size-4 text-muted-foreground" />
                             </div>
 
                             <div className="p-6 min-h-[5.5rem] pt-2">
@@ -321,7 +327,9 @@ const EvaluationPage = () => {
                                                 {t('table.column.createdAt')}
                                             </span>
                                             <span className="text-sm font-medium truncate">
-                                                {evaluation.createdAt}
+                                                {formatDateTime(
+                                                    evaluation.createdAt,
+                                                )}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
@@ -352,46 +360,35 @@ const EvaluationPage = () => {
                             <h3 className="tracking-tight text-sm font-medium">
                                 {t('common.task')}
                             </h3>
-                            <div className="text-muted-foreground h-4 w-4">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="lucide-icon lucide lucide-activity"
-                                >
-                                    <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path>
-                                </svg>
-                            </div>
+                            <ActivityIcon className="size-4 text-muted-foreground" />
                         </div>
 
                         <div className="p-6 min-h-[5.5rem] pt-2">
                             <div className="text-2xl font-bold flex gap-2">
-                                {evaluation.benchmarkTotalTasks}
+                                {formatNumber(evaluation.benchmarkTotalTasks)}
                                 <div className="text-sm font-medium flex items-end mb-1">
-                                    × {evaluation.totalRepeats}
+                                    × {formatNumber(evaluation.totalRepeats)}
                                 </div>
                             </div>
                             <div className="flex items-center justify-between mt-2">
                                 <div className="flex flex-col">
                                     <span className="text-muted-foreground text-xs">
-                                        Finished
+                                        {t('table.column.finished')}
                                     </span>
                                     <span className="text-sm font-medium">
-                                        {evaluationDTO?.nCompletedTask}
+                                        {formatNumber(
+                                            evaluationDTO?.nCompletedTask,
+                                        )}
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-end">
                                     <span className="text-muted-foreground text-xs">
-                                        Incomplete
+                                        {t('table.column.incomplete')}
                                     </span>
                                     <span className="text-sm font-medium">
-                                        {evaluationDTO?.nIncompleteTask}
+                                        {formatNumber(
+                                            evaluationDTO?.nIncompleteTask,
+                                        )}
                                     </span>
                                 </div>
                             </div>
@@ -401,35 +398,19 @@ const EvaluationPage = () => {
                     <div className="rounded-xl border shadow">
                         <div className="p-6 flex flex-row items-center justify-between space-y-0 pb-1">
                             <h3 className="tracking-tight text-sm font-medium">
-                                Metric
+                                {t('common.metric')}
                             </h3>
-                            <div className="text-muted-foreground h-4 w-4">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="lucide-icon lucide lucide-dollar-sign"
-                                >
-                                    <line x1="12" x2="12" y1="2" y2="22"></line>
-
-                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                                </svg>
-                            </div>
+                            <DollarSignIcon className="size-4 text-muted-foreground" />
                         </div>
 
                         <div className="p-6 min-h-[5.5rem] pt-2">
                             <div className="text-2xl font-bold">
-                                {evaluationDTO?.nMetric}
+                                {formatNumber(evaluationDTO?.nMetric)}
                             </div>
                             <div className="flex flex-col mt-2">
                                 <span className="text-muted-foreground text-xs">
-                                    Numerical/Categorical
+                                    {t('common.numerical')}/
+                                    {t('common.categorical')}
                                 </span>
                                 <span className="text-sm font-medium">
                                     {evaluationDTO?.nNumericalMetric}/
@@ -444,60 +425,17 @@ const EvaluationPage = () => {
                             <h3 className="tracking-tight text-sm font-medium">
                                 {t('common.token-usage')}
                             </h3>
-                            <div className="text-muted-foreground h-4 w-4">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="lucide-icon lucide lucide-cpu"
-                                >
-                                    <rect
-                                        width="16"
-                                        height="16"
-                                        x="4"
-                                        y="4"
-                                        rx="2"
-                                    ></rect>
-
-                                    <rect
-                                        width="6"
-                                        height="6"
-                                        x="9"
-                                        y="9"
-                                        rx="1"
-                                    ></rect>
-
-                                    <path d="M15 2v2"></path>
-
-                                    <path d="M15 20v2"></path>
-
-                                    <path d="M2 15h2"></path>
-
-                                    <path d="M2 9h2"></path>
-
-                                    <path d="M20 15h2"></path>
-
-                                    <path d="M20 9h2"></path>
-
-                                    <path d="M9 2v2"></path>
-
-                                    <path d="M9 20v2"></path>
-                                </svg>
-                            </div>
+                            <CpuIcon className="size-4 text-muted-foreground" />
                         </div>
 
                         <div className="p-6 min-h-[5.5rem] pt-2">
                             <div className="text-2xl font-bold">
-                                {evaluationDTO
-                                    ? evaluationDTO.nPromptTokens +
-                                      evaluationDTO.nCompletionTokens
-                                    : 'N/A'}
+                                {formatNumber(
+                                    evaluationDTO
+                                        ? evaluationDTO.nPromptTokens +
+                                              evaluationDTO.nCompletionTokens
+                                        : 'N/A',
+                                )}
                             </div>
                             <div className="flex items-center justify-between mt-2">
                                 <div className="flex flex-col">
@@ -505,7 +443,9 @@ const EvaluationPage = () => {
                                         {t('common.prompt')}
                                     </span>
                                     <span className="text-sm font-medium">
-                                        {evaluationDTO?.nPromptTokens}
+                                        {formatNumber(
+                                            evaluationDTO?.nPromptTokens,
+                                        )}
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-end">
@@ -513,7 +453,9 @@ const EvaluationPage = () => {
                                         {t('common.completion')}
                                     </span>
                                     <span className="text-sm font-medium">
-                                        {evaluationDTO?.nCompletionTokens}
+                                        {formatNumber(
+                                            evaluationDTO?.nCompletionTokens,
+                                        )}
                                     </span>
                                 </div>
                             </div>

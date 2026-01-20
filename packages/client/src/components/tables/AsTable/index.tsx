@@ -1,24 +1,24 @@
-import { memo, useMemo, useCallback, Key, useState, ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Table, TableColumnsType, TableColumnType } from 'antd';
 import { TableProps } from 'antd/es/table/InternalTable';
+import { Key, memo, ReactNode, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import EmptyData from '@/components/tables/EmptyData.tsx';
-import { renderSortIcon, renderTitle } from '@/components/tables/utils.tsx';
 import { AsPagination } from '@/components/tables/pagination.tsx';
-import { StringFilterOperator, TableRequestParams } from '@shared/types';
-import {
-    InputGroup,
-    InputGroupAddon,
-    InputGroupButton,
-    InputGroupInput,
-} from '@/components/ui/input-group.tsx';
+import { renderSortIcon, renderTitle } from '@/components/tables/utils.tsx';
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx';
+import {
+    InputGroup,
+    InputGroupAddon,
+    InputGroupButton,
+    InputGroupInput,
+} from '@/components/ui/input-group.tsx';
+import { StringFilterOperator, TableRequestParams } from '@shared/types';
 import { ChevronDownIcon } from 'lucide-react';
 
 interface AsTableProps<T> extends Omit<TableProps<T>, 'columns'> {
@@ -28,10 +28,12 @@ interface AsTableProps<T> extends Omit<TableProps<T>, 'columns'> {
         updateFn: (params: TableRequestParams) => TableRequestParams,
     ) => void;
     total: number;
-    selectedRowKeys: Key[];
+    selectedRowKeys: Key[] | undefined | null | (() => Key[]);
     setSelectedRowKeys: (keys: Key[]) => void;
     actions?: ReactNode;
     searchableColumns: Key[];
+    /** Type for search placeholder, e.g., 'project', 'trace', 'evaluation' */
+    searchType?: string;
 }
 
 const AsTable = <T extends object>({
@@ -43,6 +45,7 @@ const AsTable = <T extends object>({
     setSelectedRowKeys,
     actions,
     searchableColumns = [],
+    searchType,
     ...rest
 }: AsTableProps<T>) => {
     const { t } = useTranslation();
@@ -151,7 +154,7 @@ const AsTable = <T extends object>({
 
     const handleSearch = (searchText: string) => {
         setTableRequestParams((prevParams) => {
-            if (searchField && searchText.length > 0) {
+            if (searchField) {
                 const newFilters = {
                     [searchField]: {
                         operator: StringFilterOperator.CONTAINS,
@@ -204,9 +207,13 @@ const AsTable = <T extends object>({
     return (
         <div className="flex flex-col gap-4 w-full max-w-full">
             <div className="flex flex-row gap-2 items-center">
-                <InputGroup className="max-w-96 h-8">
+                <InputGroup className="max-w-96">
                     <InputGroupInput
-                        placeholder={t('placeholder.search-evaluation-task')}
+                        placeholder={
+                            searchType
+                                ? t(`placeholder.search-${searchType}`)
+                                : t('action.search')
+                        }
                         value={searchText}
                         onChange={(e) => setSearchText(e.target.value)}
                         onKeyUp={(e) => {
@@ -227,7 +234,9 @@ const AsTable = <T extends object>({
                                     variant="ghost"
                                     className="!pr-1.5 text-xs"
                                 >
-                                    {t('action.search')}{' '}
+                                    {searchField
+                                        ? t(`table.column.${searchField}`)
+                                        : t('action.search')}{' '}
                                     <ChevronDownIcon className="size-3" />
                                 </InputGroupButton>
                             </DropdownMenuTrigger>

@@ -1,14 +1,21 @@
 import {
     Card,
+    CardAction,
     CardContent,
     CardDescription,
-    CardAction,
     CardFooter,
-    CardTitle,
     CardHeader,
+    CardTitle,
 } from '@/components/ui/card.tsx';
+import {
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
+    type ChartConfig,
+} from '@/components/ui/chart';
+import { formatNumber } from '@/utils/common';
+import { ChartColumnBigIcon, ChartPieIcon, TrendingUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { ChartPieIcon, TrendingUp, ChartColumnBigIcon } from 'lucide-react';
 import {
     Bar,
     BarChart,
@@ -20,12 +27,6 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import {
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
-    type ChartConfig,
-} from '@/components/ui/chart';
 interface Props {
     models: Record<string, number>;
 }
@@ -93,7 +94,9 @@ export const ModelCard = ({ models }: Props) => {
                                                     y={viewBox.cy}
                                                     className="fill-foreground text-3xl font-bold"
                                                 >
-                                                    {totalLlmInvocations.toLocaleString()}
+                                                    {formatNumber(
+                                                        totalLlmInvocations,
+                                                    )}
                                                 </tspan>
                                                 <tspan
                                                     x={viewBox.cx}
@@ -113,16 +116,13 @@ export const ModelCard = ({ models }: Props) => {
                     </PieChart>
                 </ChartContainer>
             </CardContent>
-            <CardFooter className="flex-col gap-2 text-sm">
+            <CardFooter className="text-sm">
                 <div className="flex items-center gap-2 leading-none font-medium">
                     {t('description.eval.llm-footer', {
                         kind: Object.keys(models).length,
                         count: totalLlmInvocations,
                     })}
                     <TrendingUp className="h-4 w-4" />
-                </div>
-                <div className="text-muted-foreground leading-none">
-                    Showing total visitors for the last 6 months
                 </div>
             </CardFooter>
         </Card>
@@ -223,16 +223,13 @@ export const ToolCard = ({ tools }: ToolCardProps) => {
                     </BarChart>
                 </ChartContainer>
             </CardContent>
-            <CardFooter className="flex-col gap-2 text-sm">
+            <CardFooter className="text-sm">
                 <div className="flex items-center gap-2 leading-none font-medium">
                     {t('description.eval.tool-footer', {
                         kind: Object.keys(tools).length,
                         count: totalToolInvocations,
                     })}
                     <TrendingUp className="h-4 w-4" />
-                </div>
-                <div className="text-muted-foreground leading-none">
-                    Showing total visitors for the last 6 months
                 </div>
             </CardFooter>
         </Card>

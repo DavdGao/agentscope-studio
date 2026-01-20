@@ -1,41 +1,40 @@
+import { EvaluationDao } from '@/dao/evaluation';
+import { FileDao } from '@/dao/File';
+import { verifyMetadataByVersion } from '@/trpc/utils-evaluation';
 import { initTRPC, TRPCError } from '@trpc/server';
-import { z } from 'zod';
 import fs from 'fs';
+import path from 'path';
+import { z } from 'zod';
 import {
+    BlockType,
+    ContentBlocks,
+    DeleteEvaluationsParamsSchema,
     GetEvaluationResultParamsSchema,
-    GetTraceListParamsSchema,
+    GetEvaluationTasksParamsSchema,
     GetTraceParamsSchema,
     GetTraceStatisticParamsSchema,
     InputRequestData,
-    // RunData,
-    TableData,
+    MessageForm,
     ProjectData,
-    TableRequestParamsSchema,
-    ResponseBody,
     RegisterReplyParams,
     RegisterReplyParamsSchema,
+    ResponseBody,
     RunData,
-    BlockType,
-    ContentBlocks,
-    MessageForm,
     Status,
-    DeleteEvaluationsParamsSchema,
-    GetEvaluationTasksParamsSchema,
+    TableData,
     TableRequestParams,
+    TableRequestParamsSchema,
+    Trace,
 } from '../../../shared/src';
-import { RunDao } from '../dao/Run';
+import { FridayConfigManager } from '../../../shared/src/config/friday';
+import { EvalResult, Evaluation } from '../../../shared/src/types/evaluation';
+import { FridayAppMessageDao } from '../dao/FridayAppMessage';
 import { InputRequestDao } from '../dao/InputRequest';
 import { MessageDao } from '../dao/Message';
-import { SocketManager } from './socket';
-import { FridayConfigManager } from '../../../shared/src/config/friday';
-import { FridayAppMessageDao } from '../dao/FridayAppMessage';
 import { ReplyDao } from '../dao/Reply';
+import { RunDao } from '../dao/Run';
 import { SpanDao } from '../dao/Trace';
-import { verifyMetadataByVersion } from '@/trpc/utils-evaluation';
-import path from 'path';
-import { EvaluationDao } from '@/dao/evaluation';
-import { Evaluation, EvalResult } from '../../../shared/src/types/evaluation';
-import { FileDao } from '@/dao/File';
+import { SocketManager } from './socket';
 
 const textBlock = z.object({
     text: z.string(),
@@ -386,42 +385,38 @@ export const appRouter = t.router({
         .input(TableRequestParamsSchema)
         .query(async ({ input }) => {
             try {
-                const result = await RunDao.getProjects(
-                    input.pagination,
-                    input.sort,
-                    input.filters,
-                );
-
+                console.debug('[TRPC] getProjects called with input:', input);
+                const result = await RunDao.getProjects(input);
                 return {
                     success: true,
                     message: 'Projects fetched successfully',
                     data: result,
                 } as ResponseBody<TableData<ProjectData>>;
             } catch (error) {
-                console.error('Error fetching projects:', error);
-                return {
-                    success: false,
+                console.error('Error in getProjects:', error);
+                throw new TRPCError({
+                    code: 'INTERNAL_SERVER_ERROR',
                     message:
                         error instanceof Error
                             ? error.message
-                            : 'Unknown error',
-                } as ResponseBody<TableData<ProjectData>>;
+                            : 'Failed to get projects',
+                });
             }
         }),
 
-    getTraceList: t.procedure
-        .input(GetTraceListParamsSchema)
+    getTraces: t.procedure
+        .input(TableRequestParamsSchema)
         .query(async ({ input }) => {
             try {
-                console.debug('[TRPC] getTraceList called with input:', input);
-                const result = await SpanDao.getTraceList(input);
-                console.debug('[TRPC] getTraceList result:', {
-                    total: result.total,
-                    tracesCount: result.traces.length,
-                });
-                return result;
+                console.debug('[TRPC] getTraces called with input:', input);
+                const result = await SpanDao.getTraces(input);
+                return {
+                    success: true,
+                    message: 'Traces fetched successfully',
+                    data: result,
+                } as ResponseBody<TableData<Trace>>;
             } catch (error) {
-                console.error('Error in getTraceList:', error);
+                console.error('Error in getTraces:', error);
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
                     message:
@@ -491,7 +486,7 @@ export const appRouter = t.router({
                             // verify the metadata by version
                             verifyMetadataByVersion(metaData);
 
-                            // 从metadata的下划线转成驼峰，并且添加evaluationDir字段记录地址
+                            // Convert metadata from snake_case to camelCase and add evaluationDir field
                             await EvaluationDao.saveEvaluation({
                                 id: `${metaData.benchmark.name}-${metaData.createdAt}`,
                                 evaluationName: metaData.evaluation_name,
@@ -552,7 +547,6 @@ export const appRouter = t.router({
 
             try {
                 if (fs.existsSync(input.path)) {
-                    // 获取该目录下所有的文件和文件夹，只获取他们的名字，是否是文件夹，修改时间
                     const fileNames = fs
                         .readdirSync(input.path)
                         .map((fileName) => {
@@ -564,14 +558,14 @@ export const appRouter = t.router({
                                 isDirectory: stats.isDirectory(),
                             };
                         });
-                    console.log('success: ', fileNames);
+                    console.debug('success: ', fileNames);
                     return {
                         success: true,
                         message: 'Directory listed successfully',
                         data: fileNames,
                     };
                 }
-                console.log('Directory not exists: ', input.path);
+                console.error('Directory not exists: ', input.path);
                 return { success: false, message: 'Directory not exists' };
             } catch (error) {
                 console.error(error);
@@ -632,6 +626,7 @@ export const appRouter = t.router({
         .input(TableRequestParamsSchema)
         .query(async ({ input }) => {
             try {
+                console.log('getEvaluations input: ', input);
                 const result = await EvaluationDao.getEvaluations(input);
                 return {
                     success: true,

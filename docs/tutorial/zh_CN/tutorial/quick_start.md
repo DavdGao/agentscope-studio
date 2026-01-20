@@ -36,6 +36,12 @@ npm install
 npm run dev
 ```
 
+### 部署到阿里云上
+
+如果您计划在云上使用AgentScope-Studio ，推荐直接在阿里云实现一键部署。
+
+[在阿里云一键部署AgentScope-Studio](https://help.aliyun.com/zh/compute-nest/use-cases/agent-scope-studio-community-edition-service-instance-deployment-document)
+
 ## 连接到 AgentScope-Studio
 
 在 AgentScope 项目中，在 `init` 函数中设置 `studio_url` 字段，如下所示：

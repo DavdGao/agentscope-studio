@@ -62,7 +62,7 @@ export const convertToDTO = (data: EvalResult | undefined) => {
     let nPromptTokens = 0;
     let nCompletionTokens = 0;
 
-    Object.values(data.total_stats.chat_usage).forEach((usage) => {
+    Object.values(data.total_stats?.chat_usage || {}).forEach((usage) => {
         nPromptTokens += usage.input_tokens;
         nCompletionTokens += usage.output_tokens;
     });
@@ -126,8 +126,8 @@ export const convertToDTO = (data: EvalResult | undefined) => {
 
         metrics,
 
-        llm: data.total_stats?.llm,
-        tool: data.total_stats?.tool,
+        llm: data.total_stats?.llm || {},
+        tool: data.total_stats?.tool || {},
     } as EvaluationDTO;
 };
 

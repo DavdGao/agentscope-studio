@@ -1,22 +1,3 @@
-import { memo, useEffect, useState } from 'react';
-import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Tooltip,
-    XAxis,
-    YAxis,
-    LineChart,
-    Line,
-} from 'recharts';
-import { arrayToCDF, MetricsDTO } from '../utils.ts';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select.tsx';
 import {
     Card,
     CardAction,
@@ -32,12 +13,33 @@ import {
     ChartTooltip,
     ChartTooltipContent,
 } from '@/components/ui/chart.tsx';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select.tsx';
+import { memo, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Line,
+    LineChart,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+import { arrayToCDF, MetricsDTO } from '../utils.ts';
 
 interface Props {
     metrics: Record<string, MetricsDTO>;
 }
 
 const NumericalMetricView = ({ metrics }: Props) => {
+    const { t } = useTranslation();
     const [selectedMetric, setSelectedMetric] = useState<string | undefined>(
         undefined,
     );
@@ -62,19 +64,24 @@ const NumericalMetricView = ({ metrics }: Props) => {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Metric</CardTitle>
+                <CardTitle>{t('common.metric')}</CardTitle>
                 <CardDescription>
-                    The distribution and repeat-wise scores for the selected
-                    metric.
+                    {t('description.eval.metric-description')}
                 </CardDescription>
                 <CardAction className="flex flex-row gap-2">
-                    <Select value={selectedMetric}>
+                    <Select
+                        value={selectedMetric}
+                        onValueChange={setSelectedMetric}
+                    >
                         <SelectTrigger size="sm">
-                            <SelectValue placeholder="Select a metric" />
+                            <SelectValue
+                                placeholder={t('placeholder.select-metric')}
+                            />
                         </SelectTrigger>
                         <SelectContent>
                             {Object.keys(metrics).map((metricName) => (
                                 <SelectItem
+                                    key={metricName}
                                     className="truncate"
                                     value={metricName}
                                 >
@@ -127,16 +134,18 @@ const NumericalMetricView = ({ metrics }: Props) => {
                     </CardContent>
                     <CardFooter className="flex-col items-start gap-2 text-sm">
                         <div className="flex gap-2 leading-none font-medium">
-                            The {selectedMetric} scores across different
-                            repeats.
+                            {t('description.eval.metric-bar-footer', {
+                                metricName: selectedMetric,
+                            })}
                         </div>
                         <div className="text-muted-foreground leading-none">
-                            Showing{' '}
-                            {selectedMetric
-                                ? Object.keys(metrics[selectedMetric].scores)
-                                      .length
-                                : 0}{' '}
-                            repeats.
+                            {t('description.eval.showing-repeats', {
+                                count: selectedMetric
+                                    ? Object.keys(
+                                          metrics[selectedMetric].scores,
+                                      ).length
+                                    : 0,
+                            })}
                         </div>
                     </CardFooter>
                 </Card>
@@ -178,16 +187,18 @@ const NumericalMetricView = ({ metrics }: Props) => {
                     </CardContent>
                     <CardFooter className="flex-col items-start gap-2 text-sm">
                         <div className="flex gap-2 leading-none font-medium">
-                            The cumulative distribution function (CDF) of{' '}
-                            {selectedMetric}.
+                            {t('description.eval.metric-cdf-footer', {
+                                metricName: selectedMetric,
+                            })}
                         </div>
                         <div className="text-muted-foreground leading-none">
-                            Showing{' '}
-                            {selectedMetric
-                                ? Object.keys(metrics[selectedMetric].scores)
-                                      .length
-                                : 0}{' '}
-                            repeats.
+                            {t('description.eval.showing-repeats', {
+                                count: selectedMetric
+                                    ? Object.keys(
+                                          metrics[selectedMetric].scores,
+                                      ).length
+                                    : 0,
+                            })}
                         </div>
                     </CardFooter>
                 </Card>

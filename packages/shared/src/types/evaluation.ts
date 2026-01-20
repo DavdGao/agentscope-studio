@@ -129,6 +129,7 @@ export interface EvalTask {
             };
         };
     };
+    total_repeats?: number;
 }
 
 export interface EvalMetricResult {

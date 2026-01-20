@@ -1,3 +1,7 @@
+import { trpc, trpcClient } from '@/api/trpc';
+import { useMessageApi } from '@/context/MessageApiContext.tsx';
+import { TableRequestParams } from '@shared/types';
+import { EvalTaskMeta } from '@shared/types/evaluation.ts';
 import {
     createContext,
     ReactNode,
@@ -5,10 +9,6 @@ import {
     useEffect,
     useState,
 } from 'react';
-import { EvalTaskMeta } from '@shared/types/evaluation.ts';
-import { TableRequestParams } from '@shared/types';
-import { trpc, trpcClient } from '@/api/trpc';
-import { useMessageApi } from '@/context/MessageApiContext.tsx';
 
 interface EvaluationTasksContextType {
     tableDataSource: EvalTaskMeta[];
@@ -58,13 +58,9 @@ export function EvaluationTasksContextProvider({
             .catch((error) => {
                 messageApi.error(error);
             });
-    });
+    }, [evaluationId, messageApi]);
 
-    const {
-        data: response,
-        isLoading,
-        refetch,
-    } = trpc.getEvaluationTasks.useQuery(
+    const { data: response, isLoading } = trpc.getEvaluationTasks.useQuery(
         { ...tableRequestParams, evaluationId },
         {
             refetchInterval: pollingEnabled ? pollingInterval : false,
@@ -72,20 +68,6 @@ export function EvaluationTasksContextProvider({
             staleTime: 0,
         },
     );
-
-    /**
-     * Update query params and reset polling timer
-     *
-     * @param updateFn - Function to update the current TableRequestParams
-     */
-    const handleUpdateTableRequestParams = (
-        updateFn: (params: TableRequestParams) => TableRequestParams,
-    ) => {
-        setTableRequestParams((prevParams) => {
-            return updateFn(prevParams);
-        });
-        refetch();
-    };
 
     return (
         <EvaluationTasksContext.Provider
@@ -95,7 +77,7 @@ export function EvaluationTasksContextProvider({
                 tableLoading: isLoading,
                 total: response?.total || 0,
                 tableRequestParams,
-                setTableRequestParams: handleUpdateTableRequestParams,
+                setTableRequestParams,
             }}
         >
             {children}

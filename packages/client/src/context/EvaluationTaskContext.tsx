@@ -1,3 +1,5 @@
+import { trpcClient } from '@/api/trpc';
+import { useMessageApi } from '@/context/MessageApiContext.tsx';
 import { EvalTask } from '@shared/types/evaluation.ts';
 import {
     createContext,
@@ -7,21 +9,21 @@ import {
     useState,
 } from 'react';
 import { useParams } from 'react-router-dom';
-import { useMessageApi } from '@/context/MessageApiContext.tsx';
-import { trpcClient } from '@/api/trpc';
 
-interface EvaluationTaskContext {
+interface EvaluationTaskContextType {
     task: EvalTask;
 }
 
-const EvaluationTaskContext = createContext<EvaluationTaskContext | null>(null);
+const EvaluationTaskContext = createContext<EvaluationTaskContextType | null>(
+    null,
+);
 
 interface Props {
     children: ReactNode;
 }
 
 export function EvaluationTaskContextProvider({ children }: Props) {
-    const { evalId: evaluationId, taskId: taskId } = useParams<{
+    const { evalId: evaluationId, taskId } = useParams<{
         evalId: string;
         taskId: string;
     }>();
@@ -58,13 +60,13 @@ export function EvaluationTaskContextProvider({ children }: Props) {
     }
 
     return (
-        <EvaluationTaskContext
+        <EvaluationTaskContext.Provider
             value={{
                 task: evalTask,
             }}
         >
             {children}
-        </EvaluationTaskContext>
+        </EvaluationTaskContext.Provider>
     );
 }
 

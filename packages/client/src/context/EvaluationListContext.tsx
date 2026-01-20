@@ -1,3 +1,7 @@
+import { trpc, trpcClient } from '@/api/trpc.ts';
+import { useMessageApi } from '@/context/MessageApiContext.tsx';
+import { TableRequestParams } from '@shared/types';
+import { Evaluation } from '@shared/types/evaluation.ts';
 import {
     createContext,
     ReactNode,
@@ -5,10 +9,6 @@ import {
     useEffect,
     useState,
 } from 'react';
-import { ResponseBody, TableRequestParams } from '@shared/types';
-import { useMessageApi } from '@/context/MessageApiContext.tsx';
-import { trpc, trpcClient } from '@/api/trpc.ts';
-import { Evaluation } from '@shared/types/evaluation.ts';
 
 interface EvaluationListContextType {
     tableDataSource: Evaluation[];
@@ -63,22 +63,6 @@ export function EvaluationListContextProvider({
         }
     }, [error]);
 
-    /**
-     * Update query params and reset polling timer
-     *
-     * @param updateFn - function to update the table request params
-     */
-    const handleUpdateTableRequestParams = (
-        updateFn: (params: TableRequestParams) => TableRequestParams,
-    ) => {
-        // update the table request params state and reset the polling timer
-        setTableRequestParams((prevParams) => {
-            return updateFn(prevParams);
-        });
-        // Reset polling by calling refetch
-        refetch();
-    };
-
     const deleteEvaluations = async (evaluationIds: string[]) => {
         try {
             const res = await trpcClient.deleteEvaluations.mutate({
@@ -97,25 +81,19 @@ export function EvaluationListContextProvider({
     };
 
     const importEvaluation = async (evaluationDir: string) => {
-        // Send a POST request to the server
-        const response = await fetch('/trpc/importEvaluation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                evaluationDir: evaluationDir,
-            }),
-        });
-
-        // Handle the response
-        const jsonData = await response.json();
-        const backendResponse: ResponseBody = jsonData.result.data;
-        if (backendResponse.success) {
-            // messageApi.info(backendResponse.message);
-            return true;
-        } else {
-            messageApi.error(backendResponse.message);
+        try {
+            const result = await trpcClient.importEvaluation.mutate({
+                evaluationDir,
+            });
+            if (result.success) {
+                refetch();
+                return true;
+            } else {
+                messageApi.error(result.message);
+                return false;
+            }
+        } catch (error) {
+            messageApi.error((error as Error).message);
             return false;
         }
     };
@@ -127,7 +105,7 @@ export function EvaluationListContextProvider({
                 tableLoading: isLoading,
                 total: response?.data?.total || 0,
                 tableRequestParams,
-                setTableRequestParams: handleUpdateTableRequestParams,
+                setTableRequestParams,
                 deleteEvaluations,
                 importEvaluation,
             }}
